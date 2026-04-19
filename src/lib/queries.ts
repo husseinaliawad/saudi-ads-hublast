@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 
 function toLegacyAd(row: any): Ad {
   const fallback = adById(String(row.id));
+  const categorySeed = String(row.category_slug ?? row.category_id ?? row.id ?? 'ad');
+  const image = String(row.image_url ?? '').trim() || fallback?.images?.[0] || `https://loremflickr.com/1280/960/market?lock=${encodeURIComponent(categorySeed)}`;
   return {
     id: String(row.id),
     user_id: String(row.user_id ?? 'u1'),
@@ -21,7 +23,7 @@ function toLegacyAd(row: any): Ad {
     is_featured: Boolean(row.is_featured),
     views_count: fallback?.views_count ?? 0,
     favorites_count: fallback?.favorites_count ?? 0,
-    images: fallback?.images ?? ['/favicon.ico'],
+    images: [image],
     attributes: fallback?.attributes ?? [],
     created_at: String(row.created_at ?? new Date().toISOString()),
   };

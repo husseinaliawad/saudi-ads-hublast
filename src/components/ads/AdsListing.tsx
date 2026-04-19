@@ -21,13 +21,23 @@ export function AdsListing({ items, total, page, pageSize, onPageChange }: Props
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {items.map((ad) => (
-            <a key={ad.id} href={`/ad/${ad.id}`} className="rounded-2xl border border-border bg-card p-4 hover:border-primary/50 transition">
+            <a key={ad.id} href={`/ad/${ad.id}`} className="rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/50 transition">
+              <div className="aspect-[16/10] bg-muted overflow-hidden">
+                <img
+                  src={ad.image_url || `https://loremflickr.com/1280/960/market?lock=${encodeURIComponent(ad.category_slug ?? ad.id)}`}
+                  alt={ad.title}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+              <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-bold line-clamp-2">{ad.title}</h3>
                 {ad.is_featured ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">مميز</span> : null}
               </div>
               <p className="mt-2 text-primary font-extrabold"><span className="num">{formatPrice(ad.price)}</span> ر.س</p>
               <p className="mt-1 text-xs text-muted-foreground">{ad.category_name ?? '-'} · {ad.city_name ?? '-'} · {timeAgoAr(ad.created_at)}</p>
+              </div>
             </a>
           ))}
         </div>

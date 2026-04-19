@@ -30,6 +30,7 @@ export interface CatalogAd {
   title: string;
   description?: string;
   price: number;
+  image_url?: string;
   city_id?: string;
   city_name?: string;
   category_id?: string;

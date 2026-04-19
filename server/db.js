@@ -106,6 +106,7 @@ function createSchema() {
     city_id TEXT,
     status TEXT NOT NULL,
     is_featured INTEGER NOT NULL DEFAULT 0,
+    image_url TEXT,
     created_at TEXT NOT NULL,
     category_id TEXT
   )`);
@@ -166,6 +167,7 @@ function createSchema() {
   try { run('UPDATE categories SET name = COALESCE(name, name_ar)'); } catch {}
   ensureColumn('cities', 'name', 'TEXT');
   try { run('UPDATE cities SET name = COALESCE(name, name_ar)'); } catch {}
+  ensureColumn('ads', 'image_url', 'TEXT');
 }
 
 function logAdmin(action, targetType, targetId = null) {
@@ -521,6 +523,26 @@ function randomPriceForCategory(catSlug) {
   return randomInt(80, 30000);
 }
 
+function imageKeywordForSlug(slug) {
+  const s = String(slug || '').toLowerCase();
+  if (s.includes('car') || s.includes('suv') || s.includes('sedan') || s.includes('pickup') || s.includes('truck')) return 'car';
+  if (s.includes('part') || s.includes('battery') || s.includes('brake') || s.includes('engine')) return 'auto-parts';
+  if (s.includes('estate') || s.includes('apartment') || s.includes('villa') || s.includes('office') || s.includes('shop') || s.includes('warehouse') || s.includes('land') || s.includes('rent') || s.includes('sale')) return 'house';
+  if (s.includes('job') || s.includes('devops') || s.includes('developer') || s.includes('qa')) return 'office';
+  if (s.includes('service') || s.includes('maintenance') || s.includes('cleaning') || s.includes('design')) return 'service';
+  if (s.includes('electronic') || s.includes('phone') || s.includes('tablet') || s.includes('computer') || s.includes('camera') || s.includes('gaming') || s.includes('tv')) return 'technology';
+  if (s.includes('furniture') || s.includes('sofa') || s.includes('bedroom') || s.includes('living')) return 'furniture';
+  if (s.includes('fashion') || s.includes('shirt') || s.includes('women') || s.includes('men') || s.includes('kids')) return 'fashion';
+  if (s.includes('pet') || s.includes('cat') || s.includes('dog') || s.includes('bird') || s.includes('fish')) return 'animal';
+  return 'market';
+}
+
+function imageUrlForCategory(categorySlug, seedValue) {
+  const keyword = imageKeywordForSlug(categorySlug);
+  const seed = encodeURIComponent(String(seedValue ?? categorySlug ?? 'ad'));
+  return `https://loremflickr.com/1280/960/${keyword}?lock=${seed}`;
+}
+
 function randomTitleForCategory(category) {
   const prefixes = ['مميز', 'فرصة', 'إعلان مباشر', 'عرض خاص', 'بحالة ممتازة'];
   return `${randomItem(prefixes)} - ${category.name}`;
@@ -598,7 +620,7 @@ function ensureBulkAds(minPublishedCount = 1200) {
     const cat = leaves[i % leaves.length];
     const city = randomItem(cities);
     const id = uid();
-    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
+    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,image_url,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
       id,
       i % 2 === 0 ? 'u1' : 'u2',
       randomTitleForCategory(cat),
@@ -607,6 +629,7 @@ function ensureBulkAds(minPublishedCount = 1200) {
       city.id,
       'published',
       Math.random() > 0.87 ? 1 : 0,
+      imageUrlForCategory(cat.slug, `${cat.slug}-${i}`),
       randomCreatedAt(),
       cat.id,
     ]);
@@ -616,6 +639,19 @@ function ensureBulkAds(minPublishedCount = 1200) {
       const value = randomFieldValue(field, cat);
       setAdFieldValue(id, field.id, value);
     }
+  }
+}
+
+function backfillAdImages() {
+  const rows = all(`
+    SELECT a.id, c.slug
+    FROM ads a
+    LEFT JOIN categories c ON c.id = a.category_id
+    WHERE a.image_url IS NULL OR TRIM(a.image_url) = ''
+  `);
+  for (const row of rows) {
+    const slug = row.slug ?? 'market';
+    run('UPDATE ads SET image_url=? WHERE id=?', [imageUrlForCategory(slug, row.id), row.id]);
   }
 }
 
@@ -678,8 +714,8 @@ function seedIfEmpty() {
   const adsCount = Number(one('SELECT COUNT(*) AS n FROM ads')?.n ?? 0);
   if (adsCount === 0) {
     const ad1 = uid();
-    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
-      ad1, 'u1', 'شقة للبيع في الرياض', 'شقة ممتازة', 420000, 'riyadh', 'published', 1, now(), 'cat_apartment_sale',
+    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,image_url,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
+      ad1, 'u1', 'شقة للبيع في الرياض', 'شقة ممتازة', 420000, 'riyadh', 'published', 1, imageUrlForCategory('apartment-sale', ad1), now(), 'cat_apartment_sale',
     ]);
     setAdFieldValue(ad1, 'f_area', { number: 160 });
     setAdFieldValue(ad1, 'f_rooms', { number: 4 });
@@ -687,8 +723,8 @@ function seedIfEmpty() {
     setAdFieldValue(ad1, 'f_furnished', { bool: 0 });
 
     const ad2 = uid();
-    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
-      ad2, 'u2', 'جيب رانجلر 2025 كهربائي', 'سيارة بحالة الوكالة', 215000, 'jeddah', 'published', 0, now(), 'cat_cars_suv',
+    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,image_url,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
+      ad2, 'u2', 'جيب رانجلر 2025 كهربائي', 'سيارة بحالة الوكالة', 215000, 'jeddah', 'published', 0, imageUrlForCategory('suv', ad2), now(), 'cat_cars_suv',
     ]);
     setAdFieldValue(ad2, 'f_brand', { text: 'Jeep' });
     setAdFieldValue(ad2, 'f_model', { text: 'Wrangler A290' });
@@ -696,8 +732,8 @@ function seedIfEmpty() {
     setAdFieldValue(ad2, 'f_fuel', { text: 'كهربائي' });
 
     const ad3 = uid();
-    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
-      ad3, 'u1', 'قطعة كهربائية للسيارات', 'قطعة أصلية', 900, 'dammam', 'pending', 0, now(), 'cat_parts_electric',
+    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,image_url,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
+      ad3, 'u1', 'قطعة كهربائية للسيارات', 'قطعة أصلية', 900, 'dammam', 'pending', 0, imageUrlForCategory('electric-parts', ad3), now(), 'cat_parts_electric',
     ]);
     setAdFieldValue(ad3, 'f_part_type', { text: 'شاحن' });
     setAdFieldValue(ad3, 'f_part_brand', { text: 'Bosch' });
@@ -708,6 +744,7 @@ function seedIfEmpty() {
   }
 
   ensureBulkAds(1200);
+  backfillAdImages();
   saveDb();
 }
 
@@ -871,7 +908,9 @@ export function getFiltersForCategory(categoryId) {
 
 export function createAdWithFields(payload) {
   const id = uid();
-  run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
+  const category = payload.category_id ? getCategoryById(payload.category_id) : null;
+  const imageUrl = payload.image_url || imageUrlForCategory(category?.slug ?? 'market', id);
+  run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,image_url,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [
     id,
     payload.user_id ?? null,
     payload.title,
@@ -880,6 +919,7 @@ export function createAdWithFields(payload) {
     payload.city_id ?? null,
     payload.status ?? 'pending',
     payload.is_featured ? 1 : 0,
+    imageUrl,
     now(),
     payload.category_id,
   ]);
@@ -982,7 +1022,7 @@ export function getAdsWithFilters(params) {
   const total = Number(one(`SELECT COUNT(*) AS n FROM ads a ${whereSql}`, binds)?.n ?? 0);
 
   const ads = all(
-    `SELECT a.id,a.user_id,a.title,a.description,a.price,a.city_id,a.status,a.is_featured,a.created_at,a.category_id,
+    `SELECT a.id,a.user_id,a.title,a.description,a.price,a.city_id,a.status,a.is_featured,a.image_url,a.created_at,a.category_id,
             c.slug AS category_slug, c.name AS category_name,
             ci.name AS city_name
      FROM ads a
