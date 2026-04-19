@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import jwt from 'jsonwebtoken';
@@ -25,6 +25,17 @@ import {
   listMessages,
   sendMessage,
   deleteMessage,
+  getCategoryRoots,
+  listCitiesPublic,
+  getCategoryChildren,
+  getCategoryById,
+  getCategoryBySlug,
+  getCategoryBreadcrumb,
+  getCategoryDescendants,
+  getCategoryFields,
+  getFiltersForCategory,
+  getAdsWithFilters,
+  createAdWithFields,
 } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +67,7 @@ function adminOnly(req, res, next) {
   return next();
 }
 
+// Auth
 app.post('/api/auth/sign-up', (req, res) => {
   const { email, password, full_name } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Missing email/password' });
@@ -79,6 +91,74 @@ app.get('/api/auth/me', auth, (req, res) => {
   return res.json({ user });
 });
 
+// Taxonomy hierarchy
+app.get('/api/categories/tree', (_req, res) => {
+  const roots = getCategoryRoots();
+  return res.json({ roots });
+});
+
+app.get('/api/cities', (_req, res) => {
+  return res.json({ items: listCitiesPublic() });
+});
+
+app.get('/api/categories/:id/children', (req, res) => {
+  return res.json({ items: getCategoryChildren(req.params.id) });
+});
+
+app.get('/api/categories/:id/breadcrumb', (req, res) => {
+  return res.json({ items: getCategoryBreadcrumb(req.params.id) });
+});
+
+app.get('/api/categories/:id/fields', (req, res) => {
+  return res.json({ items: getCategoryFields(req.params.id) });
+});
+
+app.get('/api/categories/:id/descendants', (req, res) => {
+  return res.json({ items: getCategoryDescendants(req.params.id, true) });
+});
+
+app.get('/api/categories/slug/:slug', (req, res) => {
+  const item = getCategoryBySlug(req.params.slug);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  return res.json({ item });
+});
+
+app.get('/api/categories/:id/filters', (req, res) => {
+  return res.json({ items: getFiltersForCategory(req.params.id) });
+});
+
+// Ads browsing + creation with dynamic fields
+app.get('/api/ads', (req, res) => {
+  const dynamicFilters = {};
+  const reserved = new Set(['q', 'category', 'city', 'price_min', 'price_max', 'featured', 'sort', 'page', 'page_size']);
+  Object.entries(req.query).forEach(([k, v]) => {
+    if (reserved.has(k)) return;
+    if (k.startsWith('f_')) dynamicFilters[k.slice(2)] = v;
+    else dynamicFilters[k] = v;
+  });
+  const result = getAdsWithFilters({
+    q: req.query.q,
+    category: req.query.category,
+    city: req.query.city,
+    price_min: req.query.price_min,
+    price_max: req.query.price_max,
+    featured: req.query.featured,
+    sort: req.query.sort,
+    page: req.query.page,
+    page_size: req.query.page_size,
+    dynamic_filters: dynamicFilters,
+  });
+  return res.json(result);
+});
+
+app.post('/api/ads', auth, (req, res) => {
+  const { title, category_id } = req.body || {};
+  if (!title || !category_id) return res.status(400).json({ error: 'Missing title/category_id' });
+  const adId = createAdWithFields({ ...req.body, user_id: req.user.sub, status: 'published' });
+  return res.json({ id: adId });
+});
+
+// Admin dashboard
 app.get('/api/admin/dashboard', auth, adminOnly, (_req, res) => {
   return res.json(dashboardData());
 });

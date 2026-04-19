@@ -14,7 +14,7 @@ export function CategoryGrid({ className }: { className?: string }) {
         return (
           <Link
             key={cat.id}
-            to={`/browse?cat=${cat.slug}`}
+            to={`/browse?category=${cat.slug}`}
             className="group flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-card border border-border/60 hover:border-primary/40 hover:bg-primary-soft/40 hover:-translate-y-0.5 transition-all"
           >
             <div className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-xl bg-gradient-to-br from-primary-soft to-secondary text-primary group-hover:bg-gradient-primary group-hover:text-primary-foreground transition-all">
