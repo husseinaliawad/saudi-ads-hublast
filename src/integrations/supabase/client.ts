@@ -6,14 +6,28 @@ const env = import.meta.env;
 const SUPABASE_PROJECT_ID = env.VITE_SUPABASE_PROJECT_ID?.trim();
 const SUPABASE_URL =
   env.VITE_SUPABASE_URL?.trim() ||
+  env.VITE_SUPABASE_PROJECT_URL?.trim() ||
   (SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co` : '');
 const SUPABASE_PUBLISHABLE_KEY =
-  env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || env.VITE_SUPABASE_ANON_KEY?.trim() || '';
+  env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+  env.VITE_SUPABASE_ANON_KEY?.trim() ||
+  env.VITE_SUPABASE_KEY?.trim() ||
+  '';
 
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.error(
-    '[Supabase] Missing env vars. Set VITE_SUPABASE_URL (or VITE_SUPABASE_PROJECT_ID) and VITE_SUPABASE_PUBLISHABLE_KEY.',
-  );
+const hasPlaceholder = (value: string) =>
+  /(your_|example|invalid-project-ref|invalid-publishable-key)/i.test(value);
+
+export const supabaseConfigError =
+  !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY
+    ? 'Missing env vars: set VITE_SUPABASE_URL (or VITE_SUPABASE_PROJECT_ID) and VITE_SUPABASE_PUBLISHABLE_KEY.'
+    : hasPlaceholder(SUPABASE_URL) || hasPlaceholder(SUPABASE_PUBLISHABLE_KEY)
+      ? 'Supabase env vars contain placeholder values.'
+      : null;
+
+export const isSupabaseConfigured = !supabaseConfigError;
+
+if (supabaseConfigError) {
+  console.error(`[Supabase] ${supabaseConfigError}`);
 }
 
 const EFFECTIVE_SUPABASE_URL = SUPABASE_URL || 'https://invalid-project-ref.supabase.co';

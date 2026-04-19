@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { isSupabaseConfigured, supabase, supabaseConfigError } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
 const signInSchema = z.object({
@@ -17,6 +17,20 @@ const signUpSchema = signInSchema.extend({
 });
 
 type Mode = 'sign-in' | 'sign-up';
+
+const prettyAuthError = (message: string) => {
+  const msg = message.toLowerCase();
+  if (msg.includes('failed to fetch') || msg.includes('network')) {
+    return 'تعذّر الاتصال بخدمة التسجيل. تحقق من إعدادات Supabase على Render ثم أعد النشر.';
+  }
+  if (msg.includes('invalid login credentials')) {
+    return 'البريد أو كلمة المرور غير صحيحة';
+  }
+  if (msg.includes('already')) {
+    return 'هذا البريد مسجل مسبقًا';
+  }
+  return message;
+};
 
 const Auth = () => {
   const [mode, setMode] = useState<Mode>('sign-in');
@@ -40,6 +54,12 @@ const Auth = () => {
     setBusy(true);
 
     try {
+      if (!isSupabaseConfigured) {
+        toast.error('إعدادات Supabase غير مكتملة في بيئة التشغيل.');
+        console.error('[Auth]', supabaseConfigError);
+        return;
+      }
+
       if (mode === 'sign-up') {
         const parsed = signUpSchema.safeParse({ email, password, full_name: fullName });
         if (!parsed.success) {
@@ -57,7 +77,7 @@ const Auth = () => {
         });
 
         if (error) {
-          toast.error(error.message.includes('already') ? 'هذا البريد مسجل مسبقًا' : error.message);
+          toast.error(prettyAuthError(error.message));
         } else {
           toast.success('تم إنشاء الحساب بنجاح');
         }
@@ -79,12 +99,15 @@ const Auth = () => {
             toast.success('تم الدخول مباشرة بوضع تجريبي');
             navigate(redirect, { replace: true });
           } else {
-            toast.error(error.message.includes('Invalid') ? 'البريد أو كلمة المرور غير صحيحة' : error.message);
+            toast.error(prettyAuthError(error.message));
           }
         } else {
           toast.success('تم تسجيل الدخول بنجاح');
         }
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'حدث خطأ غير متوقع';
+      toast.error(prettyAuthError(message));
     } finally {
       setBusy(false);
     }
