@@ -35,3 +35,6 @@ dist-ssr
 # Runtime temp files
 dev.log
 dev.err.log
+
+# Local sqlite data
+data/

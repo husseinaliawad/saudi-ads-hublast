@@ -93,7 +93,14 @@ app.get('/api/auth/me', auth, (req, res) => {
 
 // Taxonomy hierarchy
 app.get('/api/categories/tree', (_req, res) => {
-  const roots = getCategoryRoots();
+  const attachChildren = (node) => {
+    const children = getCategoryChildren(node.id);
+    return {
+      ...node,
+      children: children.map(attachChildren),
+    };
+  };
+  const roots = getCategoryRoots().map(attachChildren);
   return res.json({ roots });
 });
 

@@ -79,9 +79,16 @@ export async function fetchAdById(id: string): Promise<Ad | null> {
 export async function fetchCategories(): Promise<Category[]> {
   try {
     const tree = await api<{ roots: any[] }>('/api/categories/tree');
-    const flatten = (nodes: any[]): any[] => nodes;
-    const roots = flatten(tree.roots ?? []);
-    return roots.map((c, idx) => ({
+    const flatten = (nodes: any[]): any[] => {
+      const rows: any[] = [];
+      for (const node of nodes) {
+        rows.push(node);
+        if (Array.isArray(node.children) && node.children.length > 0) rows.push(...flatten(node.children));
+      }
+      return rows;
+    };
+    const items = flatten(tree.roots ?? []);
+    return items.map((c, idx) => ({
       id: String(c.id),
       name_ar: String(c.name),
       slug: String(c.slug),

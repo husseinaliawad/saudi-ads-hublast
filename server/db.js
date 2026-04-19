@@ -172,80 +172,457 @@ function logAdmin(action, targetType, targetId = null) {
   run('INSERT INTO admin_logs (id,action,target_type,target_id,created_at) VALUES (?,?,?,?,?)', [uid(), action, targetType, targetId, now()]);
 }
 
-function resetTaxonomySeed() {
-  const n = Number(one('SELECT COUNT(*) AS n FROM categories')?.n ?? 0);
-  if (n > 0) return;
+function insertCategoryNode(node, parentId, sortOrder = 100) {
+  run('INSERT OR IGNORE INTO categories (id,name,slug,parent_id,sort_order,is_active,icon,image) VALUES (?,?,?,?,?,1,?,?)', [
+    node.id,
+    node.name,
+    node.slug,
+    parentId,
+    sortOrder,
+    node.icon ?? null,
+    node.image ?? null,
+  ]);
+  run('UPDATE categories SET name=?, slug=?, parent_id=COALESCE(parent_id, ?), sort_order=COALESCE(sort_order, ?), is_active=1 WHERE id=?', [
+    node.name,
+    node.slug,
+    parentId,
+    sortOrder,
+    node.id,
+  ]);
 
-  const categories = [
-    ['cat_realestate', 'عقارات', 'real-estate', null, 1],
-    ['cat_realestate_sale', 'للبيع', 'sale', 'cat_realestate', 1],
-    ['cat_realestate_rent', 'للإيجار', 'rent', 'cat_realestate', 2],
-    ['cat_realestate_sale_res', 'سكن', 'residential', 'cat_realestate_sale', 1],
-    ['cat_realestate_rent_res', 'سكن', 'residential-rent', 'cat_realestate_rent', 1],
-    ['cat_apartment_sale', 'شقة', 'apartment-sale', 'cat_realestate_sale_res', 1],
-    ['cat_apartment_rent', 'شقة', 'apartment-rent', 'cat_realestate_rent_res', 1],
+  const children = node.children ?? [];
+  children.forEach((child, idx) => insertCategoryNode(child, node.id, idx + 1));
+}
 
-    ['cat_cars', 'سيارات', 'cars', null, 2],
-    ['cat_cars_cars', 'سيارات', 'cars-main', 'cat_cars', 1],
-    ['cat_cars_sedan', 'سيدان', 'sedan', 'cat_cars_cars', 1],
-    ['cat_cars_suv', 'SUV', 'suv', 'cat_cars_cars', 2],
-
-    ['cat_parts', 'قطع غيار', 'parts', null, 3],
-    ['cat_parts_vehicle', 'السيارات وسيارات الدفع الرباعي', 'vehicle-parts', 'cat_parts', 1],
-    ['cat_parts_type', 'قطع غيار', 'parts-type', 'cat_parts_vehicle', 1],
-    ['cat_parts_electric', 'كهربائي', 'electric-parts', 'cat_parts_type', 1],
+function ensureRichCategories() {
+  const taxonomy = [
+    {
+      id: 'cat_realestate',
+      name: 'عقارات',
+      slug: 'real-estate',
+      icon: 'Building2',
+      children: [
+        {
+          id: 'cat_realestate_sale',
+          name: 'للبيع',
+          slug: 'real-estate-sale',
+          children: [
+            {
+              id: 'cat_realestate_sale_res',
+              name: 'سكن',
+              slug: 'real-estate-sale-residential',
+              children: [
+                { id: 'cat_apartment_sale', name: 'شقة', slug: 'apartment-sale' },
+                { id: 'cat_villa_sale', name: 'فيلا', slug: 'villa-sale' },
+                { id: 'cat_floor_sale', name: 'دور', slug: 'floor-sale' },
+                { id: 'cat_land_sale', name: 'أرض', slug: 'land-sale' },
+              ],
+            },
+            {
+              id: 'cat_realestate_sale_commercial',
+              name: 'تجاري',
+              slug: 'real-estate-sale-commercial',
+              children: [
+                { id: 'cat_office_sale', name: 'مكتب', slug: 'office-sale' },
+                { id: 'cat_shop_sale', name: 'محل', slug: 'shop-sale' },
+                { id: 'cat_warehouse_sale', name: 'مستودع', slug: 'warehouse-sale' },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'cat_realestate_rent',
+          name: 'للإيجار',
+          slug: 'real-estate-rent',
+          children: [
+            {
+              id: 'cat_realestate_rent_res',
+              name: 'سكن',
+              slug: 'real-estate-rent-residential',
+              children: [
+                { id: 'cat_apartment_rent', name: 'شقة', slug: 'apartment-rent' },
+                { id: 'cat_villa_rent', name: 'فيلا', slug: 'villa-rent' },
+                { id: 'cat_room_rent', name: 'غرفة', slug: 'room-rent' },
+              ],
+            },
+            {
+              id: 'cat_realestate_rent_commercial',
+              name: 'تجاري',
+              slug: 'real-estate-rent-commercial',
+              children: [
+                { id: 'cat_office_rent', name: 'مكتب', slug: 'office-rent' },
+                { id: 'cat_shop_rent', name: 'محل', slug: 'shop-rent' },
+                { id: 'cat_warehouse_rent', name: 'مستودع', slug: 'warehouse-rent' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cat_cars',
+      name: 'سيارات',
+      slug: 'cars',
+      icon: 'Car',
+      children: [
+        {
+          id: 'cat_cars_cars',
+          name: 'سيارات',
+          slug: 'cars-main',
+          children: [
+            { id: 'cat_cars_sedan', name: 'سيدان', slug: 'sedan' },
+            { id: 'cat_cars_suv', name: 'SUV', slug: 'suv' },
+            { id: 'cat_cars_pickup', name: 'بيك أب', slug: 'pickup' },
+            { id: 'cat_cars_hatchback', name: 'هاتشباك', slug: 'hatchback' },
+            { id: 'cat_cars_van', name: 'فان', slug: 'van' },
+            { id: 'cat_cars_luxury', name: 'فاخرة', slug: 'luxury-cars' },
+            { id: 'cat_cars_electric', name: 'كهربائية', slug: 'electric-cars' },
+            { id: 'cat_cars_hybrid', name: 'هجين', slug: 'hybrid-cars' },
+          ],
+        },
+        {
+          id: 'cat_motorcycles',
+          name: 'دراجات',
+          slug: 'motorcycles',
+          children: [
+            { id: 'cat_motorcycles_sport', name: 'رياضية', slug: 'sport-bike' },
+            { id: 'cat_motorcycles_scooter', name: 'سكوتر', slug: 'scooter' },
+          ],
+        },
+        {
+          id: 'cat_trucks',
+          name: 'شاحنات',
+          slug: 'trucks',
+          children: [
+            { id: 'cat_trucks_light', name: 'خفيفة', slug: 'light-truck' },
+            { id: 'cat_trucks_heavy', name: 'ثقيلة', slug: 'heavy-truck' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cat_parts',
+      name: 'قطع غيار',
+      slug: 'parts',
+      icon: 'Wrench',
+      children: [
+        {
+          id: 'cat_parts_vehicle',
+          name: 'سيارات ودفع رباعي',
+          slug: 'vehicle-parts',
+          children: [
+            { id: 'cat_parts_engine', name: 'محرك', slug: 'engine-parts' },
+            { id: 'cat_parts_electric', name: 'كهرباء', slug: 'electric-parts' },
+            { id: 'cat_parts_brakes', name: 'فرامل', slug: 'brakes-parts' },
+            { id: 'cat_parts_body', name: 'هيكل', slug: 'body-parts' },
+            { id: 'cat_parts_tires', name: 'إطارات', slug: 'tires' },
+            { id: 'cat_parts_battery', name: 'بطاريات', slug: 'batteries' },
+          ],
+        },
+        {
+          id: 'cat_parts_motorcycle',
+          name: 'دراجات',
+          slug: 'motorcycle-parts',
+          children: [
+            { id: 'cat_parts_motorcycle_general', name: 'قطع عامة', slug: 'motorcycle-general-parts' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cat_jobs',
+      name: 'وظائف',
+      slug: 'jobs',
+      icon: 'Briefcase',
+      children: [
+        {
+          id: 'cat_jobs_tech',
+          name: 'تقنية',
+          slug: 'tech-jobs',
+          children: [
+            { id: 'cat_jobs_dev', name: 'مطور برمجيات', slug: 'software-developer-jobs' },
+            { id: 'cat_jobs_qa', name: 'اختبار جودة', slug: 'qa-jobs' },
+            { id: 'cat_jobs_devops', name: 'DevOps', slug: 'devops-jobs' },
+            { id: 'cat_jobs_data', name: 'بيانات', slug: 'data-jobs' },
+          ],
+        },
+        {
+          id: 'cat_jobs_business',
+          name: 'إدارية ومبيعات',
+          slug: 'business-jobs',
+          children: [
+            { id: 'cat_jobs_sales', name: 'مبيعات', slug: 'sales-jobs' },
+            { id: 'cat_jobs_hr', name: 'موارد بشرية', slug: 'hr-jobs' },
+            { id: 'cat_jobs_accounting', name: 'محاسبة', slug: 'accounting-jobs' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cat_services',
+      name: 'خدمات',
+      slug: 'services',
+      icon: 'Handshake',
+      children: [
+        { id: 'cat_services_transport', name: 'نقل وشحن', slug: 'transport-services' },
+        { id: 'cat_services_maintenance', name: 'صيانة', slug: 'maintenance-services' },
+        { id: 'cat_services_cleaning', name: 'تنظيف', slug: 'cleaning-services' },
+        { id: 'cat_services_design', name: 'تصميم', slug: 'design-services' },
+        { id: 'cat_services_education', name: 'تعليم وتدريب', slug: 'education-services' },
+      ],
+    },
+    {
+      id: 'cat_electronics',
+      name: 'إلكترونيات',
+      slug: 'electronics',
+      icon: 'Smartphone',
+      children: [
+        { id: 'cat_phone', name: 'هواتف', slug: 'phones' },
+        { id: 'cat_tablets', name: 'أجهزة لوحية', slug: 'tablets' },
+        { id: 'cat_computers', name: 'كمبيوتر', slug: 'computers' },
+        { id: 'cat_tvs', name: 'تلفزيونات', slug: 'tvs' },
+        { id: 'cat_cameras', name: 'كاميرات', slug: 'cameras' },
+        { id: 'cat_gaming', name: 'ألعاب', slug: 'gaming' },
+      ],
+    },
+    {
+      id: 'cat_furniture',
+      name: 'أثاث',
+      slug: 'furniture',
+      icon: 'Sofa',
+      children: [
+        { id: 'cat_furniture_living', name: 'غرفة المعيشة', slug: 'living-room-furniture' },
+        { id: 'cat_furniture_bedroom', name: 'غرفة النوم', slug: 'bedroom-furniture' },
+        { id: 'cat_furniture_office', name: 'أثاث مكتبي', slug: 'office-furniture' },
+        { id: 'cat_furniture_kitchen', name: 'المطبخ', slug: 'kitchen-furniture' },
+      ],
+    },
+    {
+      id: 'cat_fashion',
+      name: 'أزياء',
+      slug: 'fashion',
+      icon: 'Shirt',
+      children: [
+        { id: 'cat_fashion_men', name: 'رجالي', slug: 'men-fashion' },
+        { id: 'cat_fashion_women', name: 'نسائي', slug: 'women-fashion' },
+        { id: 'cat_fashion_kids', name: 'أطفال', slug: 'kids-fashion' },
+        { id: 'cat_fashion_accessories', name: 'اكسسوارات', slug: 'fashion-accessories' },
+      ],
+    },
+    {
+      id: 'cat_pets',
+      name: 'حيوانات',
+      slug: 'pets',
+      icon: 'PawPrint',
+      children: [
+        { id: 'cat_pets_cats', name: 'قطط', slug: 'cats' },
+        { id: 'cat_pets_dogs', name: 'كلاب', slug: 'dogs' },
+        { id: 'cat_pets_birds', name: 'طيور', slug: 'birds' },
+        { id: 'cat_pets_fish', name: 'أسماك', slug: 'fish' },
+        { id: 'cat_pets_supplies', name: 'مستلزمات', slug: 'pets-supplies' },
+      ],
+    },
   ];
 
-  for (const [id, name, slug, parentId, sortOrder] of categories) {
-    run('INSERT INTO categories (id,name,slug,parent_id,sort_order,is_active,icon,image) VALUES (?,?,?,?,?,1,?,?)', [
-      id,
-      name,
-      slug,
-      parentId,
-      sortOrder,
-      null,
-      null,
-    ]);
-  }
-
+  taxonomy.forEach((root, idx) => insertCategoryNode(root, null, idx + 1));
   rebuildCategoryClosure();
+}
 
+function ensureRichFields() {
   const fields = [
-    ['f_brand', 'brand', 'الماركة', 'select', null, 1, JSON.stringify(['Toyota', 'Jeep', 'BMW', 'Mercedes', 'Hyundai']), '{}', 1, 1, 1],
-    ['f_model', 'model', 'الموديل', 'text', 'مثال: رانجلر', 1, null, '{}', 2, 1, 1],
-    ['f_year', 'year', 'سنة الصنع', 'number', '2025', 1, null, '{"min":1950,"max":2035}', 3, 1, 1],
-    ['f_fuel', 'fuel', 'الوقود', 'select', null, 1, JSON.stringify(['بنزين', 'ديزل', 'هجين', 'كهربائي']), '{}', 4, 1, 1],
+    ['f_brand', 'brand', 'الماركة', 'select', null, 0, JSON.stringify(['Toyota', 'Jeep', 'BMW', 'Mercedes', 'Hyundai', 'Kia', 'Nissan', 'Ford', 'Chevrolet', 'Lexus']), '{}', 1, 1, 1],
+    ['f_model', 'model', 'الموديل', 'text', 'مثال: رانجلر', 0, null, '{}', 2, 1, 1],
+    ['f_year', 'year', 'سنة الصنع', 'number', '2025', 0, null, '{"min":1950,"max":2035}', 3, 1, 1],
+    ['f_fuel', 'fuel', 'الوقود', 'select', null, 0, JSON.stringify(['بنزين', 'ديزل', 'هجين', 'كهربائي']), '{}', 4, 1, 1],
     ['f_transmission', 'transmission', 'القير', 'select', null, 0, JSON.stringify(['أوتوماتيك', 'عادي']), '{}', 5, 1, 0],
     ['f_color', 'color', 'اللون', 'text', null, 0, null, '{}', 6, 1, 0],
     ['f_mileage', 'mileage', 'العداد', 'number', null, 0, null, '{"min":0}', 7, 1, 0],
+    ['f_condition', 'condition', 'الحالة', 'select', null, 0, JSON.stringify(['جديد', 'مستعمل']), '{}', 8, 1, 1],
 
-    ['f_area', 'area', 'المساحة', 'number', 'متر مربع', 1, null, '{"min":1}', 1, 1, 1],
-    ['f_rooms', 'rooms', 'عدد الغرف', 'number', null, 1, null, '{"min":0,"max":20}', 2, 1, 1],
-    ['f_bathrooms', 'bathrooms', 'عدد الحمامات', 'number', null, 0, null, '{"min":0,"max":20}', 3, 1, 1],
-    ['f_furnished', 'furnished', 'مفروش', 'boolean', null, 0, null, '{}', 4, 1, 0],
-    ['f_floor', 'floor', 'الطابق', 'number', null, 0, null, '{}', 5, 1, 0],
-    ['f_property_age', 'property_age', 'عمر العقار', 'number', null, 0, null, '{}', 6, 1, 0],
+    ['f_area', 'area', 'المساحة', 'number', 'متر مربع', 0, null, '{"min":1}', 20, 1, 1],
+    ['f_rooms', 'rooms', 'عدد الغرف', 'number', null, 0, null, '{"min":0,"max":20}', 21, 1, 1],
+    ['f_bathrooms', 'bathrooms', 'عدد الحمامات', 'number', null, 0, null, '{"min":0,"max":20}', 22, 1, 1],
+    ['f_furnished', 'furnished', 'مفروش', 'boolean', null, 0, null, '{}', 23, 1, 0],
+    ['f_floor', 'floor', 'الطابق', 'number', null, 0, null, '{}', 24, 1, 0],
+    ['f_property_age', 'property_age', 'عمر العقار', 'number', null, 0, null, '{}', 25, 1, 0],
 
-    ['f_part_type', 'part_type', 'نوع القطعة', 'text', null, 1, null, '{}', 1, 1, 1],
-    ['f_part_brand', 'part_brand', 'الشركة', 'text', null, 0, null, '{}', 2, 1, 1],
-    ['f_compatibility', 'compatibility', 'التوافق', 'text', null, 0, null, '{}', 3, 1, 1],
-    ['f_part_condition', 'part_condition', 'الحالة', 'select', null, 0, JSON.stringify(['جديد', 'مستعمل']), '{}', 4, 1, 1],
+    ['f_part_type', 'part_type', 'نوع القطعة', 'text', null, 0, null, '{}', 30, 1, 1],
+    ['f_compatibility', 'compatibility', 'التوافق', 'text', null, 0, null, '{}', 31, 1, 1],
+
+    ['f_job_type', 'job_type', 'نوع الوظيفة', 'select', null, 0, JSON.stringify(['دوام كامل', 'دوام جزئي', 'عن بعد']), '{}', 40, 1, 1],
+    ['f_experience', 'experience', 'الخبرة', 'select', null, 0, JSON.stringify(['مبتدئ', 'متوسط', 'متقدم']), '{}', 41, 1, 1],
+    ['f_salary', 'salary', 'الراتب', 'number', null, 0, null, '{"min":0}', 42, 1, 1],
+
+    ['f_service_type', 'service_type', 'نوع الخدمة', 'text', null, 0, null, '{}', 50, 1, 1],
+    ['f_delivery_time', 'delivery_time', 'مدة التنفيذ', 'select', null, 0, JSON.stringify(['خلال يوم', 'خلال 3 أيام', 'خلال أسبوع']), '{}', 51, 1, 1],
+
+    ['f_storage', 'storage', 'السعة', 'select', null, 0, JSON.stringify(['64GB', '128GB', '256GB', '512GB', '1TB']), '{}', 60, 1, 1],
+    ['f_ram', 'ram', 'الرام', 'select', null, 0, JSON.stringify(['4GB', '8GB', '16GB', '32GB']), '{}', 61, 1, 1],
+    ['f_screen', 'screen', 'حجم الشاشة', 'text', null, 0, null, '{}', 62, 1, 1],
+    ['f_warranty', 'warranty', 'ضمان', 'boolean', null, 0, null, '{}', 63, 1, 1],
+
+    ['f_pet_age', 'pet_age', 'العمر', 'number', null, 0, null, '{"min":0}', 70, 1, 1],
+    ['f_gender', 'gender', 'الجنس', 'select', null, 0, JSON.stringify(['ذكر', 'أنثى']), '{}', 71, 1, 1],
   ];
 
   for (const field of fields) {
-    run('INSERT INTO custom_fields (id,field_key,label,type,placeholder,required,options_json,validation_json,sort_order,is_filterable,is_searchable,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)', field);
+    run(
+      'INSERT OR IGNORE INTO custom_fields (id,field_key,label,type,placeholder,required,options_json,validation_json,sort_order,is_filterable,is_searchable,is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)',
+      field,
+    );
+  }
+}
+
+function mapFieldsForCategoryAndChildren(categoryId, fieldIds) {
+  const descendants = getCategoryDescendants(categoryId, true).filter((d) => Number(d.depth) > 0);
+  const targets = descendants.length > 0 ? descendants.map((d) => d.id) : [categoryId];
+  for (const catId of targets) {
+    fieldIds.forEach((fieldId, idx) => {
+      run('INSERT OR IGNORE INTO category_field_map (category_id,field_id,sort_order) VALUES (?,?,?)', [catId, fieldId, idx + 1]);
+    });
+  }
+}
+
+function ensureRichFieldMapping() {
+  mapFieldsForCategoryAndChildren('cat_cars', ['f_brand', 'f_model', 'f_year', 'f_fuel', 'f_transmission', 'f_color', 'f_mileage', 'f_condition']);
+  mapFieldsForCategoryAndChildren('cat_parts', ['f_part_type', 'f_brand', 'f_compatibility', 'f_condition']);
+  mapFieldsForCategoryAndChildren('cat_realestate', ['f_area', 'f_rooms', 'f_bathrooms', 'f_furnished', 'f_floor', 'f_property_age', 'f_condition']);
+  mapFieldsForCategoryAndChildren('cat_jobs', ['f_job_type', 'f_experience', 'f_salary']);
+  mapFieldsForCategoryAndChildren('cat_services', ['f_service_type', 'f_delivery_time', 'f_condition']);
+  mapFieldsForCategoryAndChildren('cat_electronics', ['f_brand', 'f_model', 'f_storage', 'f_ram', 'f_screen', 'f_warranty', 'f_condition']);
+  mapFieldsForCategoryAndChildren('cat_furniture', ['f_condition', 'f_color']);
+  mapFieldsForCategoryAndChildren('cat_fashion', ['f_condition', 'f_color']);
+  mapFieldsForCategoryAndChildren('cat_pets', ['f_pet_age', 'f_gender', 'f_condition']);
+}
+
+function randomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomCreatedAt() {
+  const days = randomInt(0, 270);
+  const date = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return date.toISOString();
+}
+
+function randomPriceForCategory(catSlug) {
+  if (catSlug.includes('sale') || catSlug.includes('land') || catSlug.includes('villa') || catSlug.includes('office')) return randomInt(150000, 3500000);
+  if (catSlug.includes('rent')) return randomInt(900, 22000);
+  if (catSlug.includes('cars') || catSlug.includes('suv') || catSlug.includes('sedan') || catSlug.includes('pickup') || catSlug.includes('truck')) return randomInt(9000, 420000);
+  if (catSlug.includes('parts')) return randomInt(50, 9000);
+  if (catSlug.includes('job')) return randomInt(2500, 25000);
+  if (catSlug.includes('electronics')) return randomInt(250, 20000);
+  if (catSlug.includes('furniture') || catSlug.includes('fashion')) return randomInt(60, 18000);
+  if (catSlug.includes('pets')) return randomInt(100, 7000);
+  return randomInt(80, 30000);
+}
+
+function randomTitleForCategory(category) {
+  const prefixes = ['مميز', 'فرصة', 'إعلان مباشر', 'عرض خاص', 'بحالة ممتازة'];
+  return `${randomItem(prefixes)} - ${category.name}`;
+}
+
+function randomDescriptionForCategory(category) {
+  const snippets = [
+    'تفاصيل دقيقة وصور واضحة والتواصل مباشر.',
+    'سعر قابل للتفاوض بشكل معقول.',
+    'متوفر الآن مع إمكانية المعاينة.',
+    'إعلان موثوق وتمت إضافة كل المواصفات.',
+  ];
+  return `${category.name} ${randomItem(snippets)}`;
+}
+
+function randomFieldValue(field, category) {
+  const type = String(field.type);
+  const catSlug = String(category.slug);
+  if (type === 'number') {
+    if (field.field_key === 'year') return { number: randomInt(2008, 2026) };
+    if (field.field_key === 'mileage') return { number: randomInt(0, 240000) };
+    if (field.field_key === 'area') return { number: randomInt(40, 900) };
+    if (field.field_key === 'rooms') return { number: randomInt(1, 9) };
+    if (field.field_key === 'bathrooms') return { number: randomInt(1, 7) };
+    if (field.field_key === 'salary') return { number: randomInt(3000, 28000) };
+    if (field.field_key === 'pet_age') return { number: randomInt(1, 12) };
+    return { number: randomInt(1, 500) };
+  }
+  if (type === 'boolean' || type === 'checkbox') return { bool: Math.random() > 0.5 ? 1 : 0 };
+  if (field.options_json) {
+    const options = JSON.parse(String(field.options_json));
+    if (Array.isArray(options) && options.length > 0) return { text: String(randomItem(options)) };
+  }
+  if (field.field_key === 'model') {
+    if (catSlug.includes('suv')) return { text: randomItem(['رانجلر', 'برادو', 'تاهو', 'إكسبلورر']) };
+    if (catSlug.includes('sedan')) return { text: randomItem(['كامري', 'سوناتا', 'أكورد', 'مازدا 6']) };
+    return { text: randomItem(['موديل A', 'موديل B', 'موديل C']) };
+  }
+  if (field.field_key === 'service_type') return { text: randomItem(['تركيب', 'صيانة', 'نقل', 'تنظيف']) };
+  if (field.field_key === 'part_type') return { text: randomItem(['شاحن', 'كمبروسر', 'فلتر', 'طرمبة']) };
+  if (field.field_key === 'compatibility') return { text: randomItem(['تويوتا', 'هيونداي', 'نيسان', 'فورد']) };
+  if (field.field_key === 'screen') return { text: randomItem(['6.1"', '6.7"', '13"', '15.6"', '55"']) };
+  if (field.field_key === 'color') return { text: randomItem(['أبيض', 'أسود', 'فضي', 'أزرق', 'أحمر']) };
+  return { text: `${category.name} ${field.label}` };
+}
+
+function ensureBulkAds(minPublishedCount = 1200) {
+  const currentPublished = Number(one("SELECT COUNT(*) AS n FROM ads WHERE status='published'")?.n ?? 0);
+  if (currentPublished >= minPublishedCount) return;
+
+  const cities = all('SELECT id FROM cities WHERE is_active=1');
+  const leaves = all(`
+    SELECT c.id,c.name,c.slug
+    FROM categories c
+    WHERE c.is_active=1
+      AND NOT EXISTS (SELECT 1 FROM categories x WHERE x.parent_id = c.id AND x.is_active=1)
+    ORDER BY c.sort_order ASC
+  `);
+  if (cities.length === 0 || leaves.length === 0) return;
+
+  const fieldsByCategory = new Map();
+  const rows = all(`
+    SELECT m.category_id, cf.id, cf.field_key, cf.label, cf.type, cf.options_json
+    FROM category_field_map m
+    JOIN custom_fields cf ON cf.id = m.field_id
+    WHERE cf.is_active=1
+  `);
+  for (const row of rows) {
+    if (!fieldsByCategory.has(row.category_id)) fieldsByCategory.set(row.category_id, []);
+    fieldsByCategory.get(row.category_id).push(row);
   }
 
-  const map = [
-    ['cat_cars_sedan', 'f_brand', 1], ['cat_cars_sedan', 'f_model', 2], ['cat_cars_sedan', 'f_year', 3], ['cat_cars_sedan', 'f_fuel', 4], ['cat_cars_sedan', 'f_transmission', 5], ['cat_cars_sedan', 'f_color', 6], ['cat_cars_sedan', 'f_mileage', 7],
-    ['cat_cars_suv', 'f_brand', 1], ['cat_cars_suv', 'f_model', 2], ['cat_cars_suv', 'f_year', 3], ['cat_cars_suv', 'f_fuel', 4], ['cat_cars_suv', 'f_transmission', 5], ['cat_cars_suv', 'f_color', 6], ['cat_cars_suv', 'f_mileage', 7],
-    ['cat_apartment_sale', 'f_area', 1], ['cat_apartment_sale', 'f_rooms', 2], ['cat_apartment_sale', 'f_bathrooms', 3], ['cat_apartment_sale', 'f_furnished', 4], ['cat_apartment_sale', 'f_floor', 5], ['cat_apartment_sale', 'f_property_age', 6],
-    ['cat_apartment_rent', 'f_area', 1], ['cat_apartment_rent', 'f_rooms', 2], ['cat_apartment_rent', 'f_bathrooms', 3], ['cat_apartment_rent', 'f_furnished', 4], ['cat_apartment_rent', 'f_floor', 5], ['cat_apartment_rent', 'f_property_age', 6],
-    ['cat_parts_electric', 'f_part_type', 1], ['cat_parts_electric', 'f_part_brand', 2], ['cat_parts_electric', 'f_compatibility', 3], ['cat_parts_electric', 'f_part_condition', 4],
-  ];
-  for (const [catId, fieldId, sortOrder] of map) {
-    run('INSERT INTO category_field_map (category_id,field_id,sort_order) VALUES (?,?,?)', [catId, fieldId, sortOrder]);
+  const toInsert = minPublishedCount - currentPublished;
+  for (let i = 0; i < toInsert; i += 1) {
+    const cat = leaves[i % leaves.length];
+    const city = randomItem(cities);
+    const id = uid();
+    run('INSERT INTO ads (id,user_id,title,description,price,city_id,status,is_featured,created_at,category_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [
+      id,
+      i % 2 === 0 ? 'u1' : 'u2',
+      randomTitleForCategory(cat),
+      randomDescriptionForCategory(cat),
+      randomPriceForCategory(String(cat.slug)),
+      city.id,
+      'published',
+      Math.random() > 0.87 ? 1 : 0,
+      randomCreatedAt(),
+      cat.id,
+    ]);
+
+    const catFields = fieldsByCategory.get(cat.id) ?? [];
+    for (const field of catFields) {
+      const value = randomFieldValue(field, cat);
+      setAdFieldValue(id, field.id, value);
+    }
   }
+}
+
+function ensureRichCatalogSeed() {
+  ensureRichCategories();
+  ensureRichFields();
+  ensureRichFieldMapping();
 }
 
 function seedIfEmpty() {
@@ -262,11 +639,41 @@ function seedIfEmpty() {
       ['riyadh', 'الرياض', 'الوسطى'],
       ['jeddah', 'جدة', 'الغربية'],
       ['dammam', 'الدمام', 'الشرقية'],
+      ['makkah', 'مكة', 'الغربية'],
+      ['madinah', 'المدينة المنورة', 'الغربية'],
+      ['khobar', 'الخبر', 'الشرقية'],
+      ['taif', 'الطائف', 'الغربية'],
+      ['abha', 'أبها', 'الجنوبية'],
+      ['tabuk', 'تبوك', 'الشمالية'],
+      ['hail', 'حائل', 'الشمالية'],
+      ['najran', 'نجران', 'الجنوبية'],
+      ['jazan', 'جازان', 'الجنوبية'],
+      ['qassim', 'القصيم', 'الوسطى'],
+      ['jubail', 'الجبيل', 'الشرقية'],
+      ['yanbu', 'ينبع', 'الغربية'],
     ];
     for (const [id, name, region] of cities) run('INSERT INTO cities (id,name,region,is_active) VALUES (?,?,?,1)', [id, name, region]);
+  } else {
+    const extraCities = [
+      ['makkah', 'مكة', 'الغربية'],
+      ['madinah', 'المدينة المنورة', 'الغربية'],
+      ['khobar', 'الخبر', 'الشرقية'],
+      ['taif', 'الطائف', 'الغربية'],
+      ['abha', 'أبها', 'الجنوبية'],
+      ['tabuk', 'تبوك', 'الشمالية'],
+      ['hail', 'حائل', 'الشمالية'],
+      ['najran', 'نجران', 'الجنوبية'],
+      ['jazan', 'جازان', 'الجنوبية'],
+      ['qassim', 'القصيم', 'الوسطى'],
+      ['jubail', 'الجبيل', 'الشرقية'],
+      ['yanbu', 'ينبع', 'الغربية'],
+    ];
+    for (const [id, name, region] of extraCities) {
+      run('INSERT OR IGNORE INTO cities (id,name,region,is_active) VALUES (?,?,?,1)', [id, name, region]);
+    }
   }
 
-  resetTaxonomySeed();
+  ensureRichCatalogSeed();
 
   const adsCount = Number(one('SELECT COUNT(*) AS n FROM ads')?.n ?? 0);
   if (adsCount === 0) {
@@ -298,8 +705,10 @@ function seedIfEmpty() {
     run('INSERT INTO reports (id,ad_id,reason,details,status,created_at) VALUES (?,?,?,?,?,?)', [uid(), ad3, 'مخالفة', 'يرجى مراجعة الإعلان', 'open', now()]);
     run('INSERT INTO feature_orders (id,ad_id,plan_id,status,created_at) VALUES (?,?,?,?,?)', [uid(), ad2, 'plan-7d', 'pending', now()]);
     run('INSERT INTO messages (id,sender_id,recipient_id,body,is_read,created_at) VALUES (?,?,?,?,?,?)', [uid(), 'u1', 'u2', 'مرحبا، هل الإعلان متاح؟', 0, now()]);
-    saveDb();
   }
+
+  ensureBulkAds(1200);
+  saveDb();
 }
 
 export async function initDb() {
