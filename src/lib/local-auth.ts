@@ -13,12 +13,39 @@ type StoredUser = AuthUser & {
 
 const USERS_KEY = 'local_auth_users_v1';
 const SESSION_KEY = 'local_auth_session_v1';
+const DEFAULT_ADMIN_EMAIL = 'admin@local.test';
+const DEFAULT_ADMIN_PASSWORD = 'Admin@123456';
+const DEFAULT_ADMIN_ID = '00000000-0000-4000-8000-000000000010';
+
+function ensureDefaultAdmin(users: StoredUser[]): StoredUser[] {
+  const hasAdmin = users.some((u) => normalizeEmail(u.email) === DEFAULT_ADMIN_EMAIL);
+  if (hasAdmin) return users;
+
+  const now = new Date().toISOString();
+  return [
+    ...users,
+    {
+      id: DEFAULT_ADMIN_ID,
+      email: DEFAULT_ADMIN_EMAIL,
+      password: DEFAULT_ADMIN_PASSWORD,
+      created_at: now,
+      user_metadata: { full_name: 'Admin' },
+    },
+  ];
+}
 
 function loadUsers(): StoredUser[] {
   try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]') as StoredUser[];
+    const parsed = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]') as StoredUser[];
+    const withAdmin = ensureDefaultAdmin(parsed);
+    if (withAdmin.length !== parsed.length) {
+      saveUsers(withAdmin);
+    }
+    return withAdmin;
   } catch {
-    return [];
+    const seeded = ensureDefaultAdmin([]);
+    saveUsers(seeded);
+    return seeded;
   }
 }
 
