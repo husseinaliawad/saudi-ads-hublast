@@ -58,7 +58,7 @@ const Auth = () => {
           return;
         }
 
-        const { error } = signUpLocal({
+        const { error } = await signUpLocal({
           email: parsed.data.email,
           password: parsed.data.password,
           fullName: parsed.data.full_name,
@@ -78,7 +78,7 @@ const Auth = () => {
           return;
         }
 
-        const { error } = signInLocal({
+        const { error } = await signInLocal({
           email: parsed.data.email,
           password: parsed.data.password,
         });

@@ -1,118 +1,67 @@
+import { api, setAuthToken } from '@/lib/api';
+
 export type AuthUser = {
   id: string;
   email: string;
-  user_metadata: {
+  full_name?: string;
+  is_admin?: number | boolean;
+  created_at: string;
+  user_metadata?: {
     full_name?: string;
   };
-  created_at: string;
 };
 
-type StoredUser = AuthUser & {
-  password: string;
+type AuthResponse = {
+  user: AuthUser;
+  token: string;
 };
 
-const USERS_KEY = 'local_auth_users_v1';
-const SESSION_KEY = 'local_auth_session_v1';
-const DEFAULT_ADMIN_EMAIL = 'admin@local.test';
-const DEFAULT_ADMIN_PASSWORD = 'Admin@123456';
-const DEFAULT_ADMIN_ID = '00000000-0000-4000-8000-000000000010';
-
-function ensureDefaultAdmin(users: StoredUser[]): StoredUser[] {
-  const hasAdmin = users.some((u) => normalizeEmail(u.email) === DEFAULT_ADMIN_EMAIL);
-  if (hasAdmin) return users;
-
-  const now = new Date().toISOString();
-  return [
-    ...users,
-    {
-      id: DEFAULT_ADMIN_ID,
-      email: DEFAULT_ADMIN_EMAIL,
-      password: DEFAULT_ADMIN_PASSWORD,
-      created_at: now,
-      user_metadata: { full_name: 'Admin' },
-    },
-  ];
-}
-
-function loadUsers(): StoredUser[] {
+export async function getSessionUser(): Promise<AuthUser | null> {
   try {
-    const parsed = JSON.parse(localStorage.getItem(USERS_KEY) ?? '[]') as StoredUser[];
-    const withAdmin = ensureDefaultAdmin(parsed);
-    if (withAdmin.length !== parsed.length) {
-      saveUsers(withAdmin);
-    }
-    return withAdmin;
-  } catch {
-    const seeded = ensureDefaultAdmin([]);
-    saveUsers(seeded);
-    return seeded;
-  }
-}
-
-function saveUsers(users: StoredUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
-function stripPassword(user: StoredUser): AuthUser {
-  return {
-    id: user.id,
-    email: user.email,
-    user_metadata: user.user_metadata,
-    created_at: user.created_at,
-  };
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
-
-export function getSessionUser(): AuthUser | null {
-  try {
-    const id = localStorage.getItem(SESSION_KEY);
-    if (!id) return null;
-    const user = loadUsers().find((u) => u.id === id);
-    return user ? stripPassword(user) : null;
+    const res = await api<{ user: AuthUser }>('/api/auth/me');
+    return res.user;
   } catch {
     return null;
   }
 }
 
 export function signOutLocal() {
-  localStorage.removeItem(SESSION_KEY);
+  setAuthToken(null);
 }
 
-export function signUpLocal(params: {
+export async function signUpLocal(params: {
   email: string;
   password: string;
   fullName?: string;
-}): { user: AuthUser | null; error: string | null } {
-  const email = normalizeEmail(params.email);
-  const users = loadUsers();
-  if (users.some((u) => u.email === email)) {
-    return { user: null, error: 'هذا البريد مسجل مسبقًا' };
+}): Promise<{ user: AuthUser | null; error: string | null }> {
+  try {
+    const res = await api<AuthResponse>('/api/auth/sign-up', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: params.email,
+        password: params.password,
+        full_name: params.fullName ?? '',
+      }),
+    });
+    setAuthToken(res.token);
+    return { user: res.user, error: null };
+  } catch (err) {
+    return { user: null, error: err instanceof Error ? err.message : 'فشل إنشاء الحساب' };
   }
-
-  const now = new Date().toISOString();
-  const user: StoredUser = {
-    id: crypto.randomUUID(),
-    email,
-    password: params.password,
-    created_at: now,
-    user_metadata: { full_name: params.fullName?.trim() || '' },
-  };
-  users.push(user);
-  saveUsers(users);
-  localStorage.setItem(SESSION_KEY, user.id);
-  return { user: stripPassword(user), error: null };
 }
 
-export function signInLocal(params: {
+export async function signInLocal(params: {
   email: string;
   password: string;
-}): { user: AuthUser | null; error: string | null } {
-  const email = normalizeEmail(params.email);
-  const user = loadUsers().find((u) => u.email === email && u.password === params.password);
-  if (!user) return { user: null, error: 'البريد أو كلمة المرور غير صحيحة' };
-  localStorage.setItem(SESSION_KEY, user.id);
-  return { user: stripPassword(user), error: null };
+}): Promise<{ user: AuthUser | null; error: string | null }> {
+  try {
+    const res = await api<AuthResponse>('/api/auth/sign-in', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+    setAuthToken(res.token);
+    return { user: res.user, error: null };
+  } catch (err) {
+    return { user: null, error: err instanceof Error ? err.message : 'فشل تسجيل الدخول' };
+  }
 }

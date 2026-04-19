@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const enterDevMode = (email: string, fullName?: string) => {
     const u = toDevUser(email, fullName);
-    localStorage.setItem(DEV_USER_KEY, JSON.stringify({ email: u.email, full_name: u.user_metadata.full_name ?? '' }));
+    localStorage.setItem(DEV_USER_KEY, JSON.stringify({ email: u.email, full_name: u.user_metadata?.full_name ?? '' }));
     signOutLocal();
     setDevUser(u);
     setSession(null);
@@ -41,28 +41,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const localSessionUser = getSessionUser();
-    if (localSessionUser) {
-      localStorage.removeItem(DEV_USER_KEY);
-      setDevUser(null);
-      setSession({ user: localSessionUser });
-      setIsAdmin(localSessionUser.email === 'admin@local.test');
-      setLoading(false);
-      return;
-    }
-
-    const saved = localStorage.getItem(DEV_USER_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as { email: string; full_name?: string };
-        if (parsed?.email) setDevUser(toDevUser(parsed.email, parsed.full_name));
-      } catch {
+    (async () => {
+      const liveUser = await getSessionUser();
+      if (liveUser) {
         localStorage.removeItem(DEV_USER_KEY);
+        setDevUser(null);
+        setSession({ user: liveUser });
+        setIsAdmin(Boolean(liveUser.is_admin) || liveUser.email === 'admin@local.test');
+        setLoading(false);
+        return;
       }
-    }
 
-    setIsAdmin(false);
-    setLoading(false);
+      const saved = localStorage.getItem(DEV_USER_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as { email: string; full_name?: string };
+          if (parsed?.email) setDevUser(toDevUser(parsed.email, parsed.full_name));
+        } catch {
+          localStorage.removeItem(DEV_USER_KEY);
+        }
+      }
+
+      setIsAdmin(false);
+      setLoading(false);
+    })();
   }, []);
 
   const signOut = async () => {
