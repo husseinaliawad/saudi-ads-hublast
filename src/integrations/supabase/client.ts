@@ -2,17 +2,28 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: Record<string, string | undefined>;
+  }
+}
+
 const env = import.meta.env;
-const SUPABASE_PROJECT_ID = env.VITE_SUPABASE_PROJECT_ID?.trim();
+const runtimeConfig = typeof window !== 'undefined' ? window.__RUNTIME_CONFIG__ ?? {} : {};
+const read = (...values: Array<string | undefined>) =>
+  values.map((v) => (v ?? '').trim()).find((v) => !!v) ?? '';
+
+const SUPABASE_PROJECT_ID = read(runtimeConfig.VITE_SUPABASE_PROJECT_ID, env.VITE_SUPABASE_PROJECT_ID);
 const SUPABASE_URL =
-  env.VITE_SUPABASE_URL?.trim() ||
-  env.VITE_SUPABASE_PROJECT_URL?.trim() ||
+  read(runtimeConfig.VITE_SUPABASE_URL, env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PROJECT_URL) ||
   (SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co` : '');
-const SUPABASE_PUBLISHABLE_KEY =
-  env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-  env.VITE_SUPABASE_ANON_KEY?.trim() ||
-  env.VITE_SUPABASE_KEY?.trim() ||
-  '';
+const SUPABASE_PUBLISHABLE_KEY = read(
+  runtimeConfig.VITE_SUPABASE_PUBLISHABLE_KEY,
+  runtimeConfig.VITE_SUPABASE_ANON_KEY,
+  env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  env.VITE_SUPABASE_ANON_KEY,
+  env.VITE_SUPABASE_KEY,
+);
 
 const hasPlaceholder = (value: string) =>
   /(your_|example|invalid-project-ref|invalid-publishable-key)/i.test(value);
