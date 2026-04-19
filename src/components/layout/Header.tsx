@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 
 const navItems = [
   { to: '/', label: 'الرئيسية' },
@@ -19,7 +19,7 @@ function UnreadDot() {
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
-    if (!user) { setUnread(0); return; }
+    if (!user || !isSupabaseConfigured) { setUnread(0); return; }
     let active = true;
     const fetchCount = async () => {
       const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true })

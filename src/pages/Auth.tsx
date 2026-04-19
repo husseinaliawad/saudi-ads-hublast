@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { isSupabaseConfigured, supabase, supabaseConfigError } from '@/integrations/supabase/client';
+import { signInLocal, signUpLocal } from '@/lib/local-auth';
 import { useAuth } from '@/context/AuthContext';
 
 const signInSchema = z.object({
@@ -20,9 +20,6 @@ type Mode = 'sign-in' | 'sign-up';
 
 const prettyAuthError = (message: string) => {
   const msg = message.toLowerCase();
-  if (msg.includes('failed to fetch') || msg.includes('network')) {
-    return 'تعذّر الاتصال بخدمة التسجيل. تحقق من إعدادات Supabase على Render ثم أعد النشر.';
-  }
   if (msg.includes('invalid login credentials')) {
     return 'البريد أو كلمة المرور غير صحيحة';
   }
@@ -43,7 +40,7 @@ const Auth = () => {
   const [sp] = useSearchParams();
   const redirect = sp.get('redirect') ?? '/';
   const navigate = useNavigate();
-  const { user, enterDevMode } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (user) navigate(redirect, { replace: true });
@@ -54,12 +51,6 @@ const Auth = () => {
     setBusy(true);
 
     try {
-      if (!isSupabaseConfigured) {
-        toast.error('إعدادات Supabase غير مكتملة في بيئة التشغيل.');
-        console.error('[Auth]', supabaseConfigError);
-        return;
-      }
-
       if (mode === 'sign-up') {
         const parsed = signUpSchema.safeParse({ email, password, full_name: fullName });
         if (!parsed.success) {
@@ -67,19 +58,18 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { error } = signUpLocal({
           email: parsed.data.email,
           password: parsed.data.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: { full_name: parsed.data.full_name },
-          },
+          fullName: parsed.data.full_name,
         });
 
         if (error) {
-          toast.error(prettyAuthError(error.message));
+          toast.error(prettyAuthError(error));
         } else {
           toast.success('تم إنشاء الحساب بنجاح');
+          window.location.replace(redirect);
+          return;
         }
       } else {
         const parsed = signInSchema.safeParse({ email, password });
@@ -88,21 +78,17 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error } = signInLocal({
           email: parsed.data.email,
           password: parsed.data.password,
         });
 
         if (error) {
-          if (error.message.toLowerCase().includes('email not confirmed')) {
-            enterDevMode(parsed.data.email);
-            toast.success('تم الدخول مباشرة بوضع تجريبي');
-            navigate(redirect, { replace: true });
-          } else {
-            toast.error(prettyAuthError(error.message));
-          }
+          toast.error(prettyAuthError(error));
         } else {
           toast.success('تم تسجيل الدخول بنجاح');
+          window.location.replace(redirect);
+          return;
         }
       }
     } catch (err) {
