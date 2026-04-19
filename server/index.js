@@ -17,6 +17,14 @@ import {
   createCity,
   toggleCategory,
   toggleCity,
+  createAd,
+  listUsers,
+  toggleUserAdmin,
+  toggleUserActive,
+  resetUserPassword,
+  listMessages,
+  sendMessage,
+  deleteMessage,
 } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -90,6 +98,11 @@ app.delete('/api/admin/ads/:id', auth, adminOnly, (req, res) => {
   return res.json({ ok: true });
 });
 
+app.post('/api/admin/ads', auth, adminOnly, (req, res) => {
+  const adId = createAd(req.body || {});
+  return res.json({ ok: true, id: adId });
+});
+
 app.post('/api/admin/reports/:id/resolve', auth, adminOnly, (req, res) => {
   setReportStatus(req.params.id, req.body?.status || 'resolved');
   return res.json({ ok: true });
@@ -117,6 +130,43 @@ app.post('/api/admin/categories/:id/toggle', auth, adminOnly, (req, res) => {
 
 app.post('/api/admin/cities/:id/toggle', auth, adminOnly, (req, res) => {
   toggleCity(req.params.id);
+  return res.json({ ok: true });
+});
+
+app.get('/api/admin/users', auth, adminOnly, (_req, res) => {
+  return res.json({ users: listUsers() });
+});
+
+app.post('/api/admin/users/:id/toggle-admin', auth, adminOnly, (req, res) => {
+  toggleUserAdmin(req.params.id);
+  return res.json({ ok: true });
+});
+
+app.post('/api/admin/users/:id/toggle-active', auth, adminOnly, (req, res) => {
+  toggleUserActive(req.params.id);
+  return res.json({ ok: true });
+});
+
+app.post('/api/admin/users/:id/reset-password', auth, adminOnly, (req, res) => {
+  const password = String(req.body?.password || '').trim();
+  if (password.length < 6) return res.status(400).json({ error: 'Password too short' });
+  resetUserPassword(req.params.id, password);
+  return res.json({ ok: true });
+});
+
+app.get('/api/admin/messages', auth, adminOnly, (_req, res) => {
+  return res.json({ messages: listMessages() });
+});
+
+app.post('/api/admin/messages', auth, adminOnly, (req, res) => {
+  const { sender_id, recipient_id, body } = req.body || {};
+  if (!sender_id || !recipient_id || !body) return res.status(400).json({ error: 'Missing message fields' });
+  const id = sendMessage({ sender_id, recipient_id, body });
+  return res.json({ ok: true, id });
+});
+
+app.delete('/api/admin/messages/:id', auth, adminOnly, (req, res) => {
+  deleteMessage(req.params.id);
   return res.json({ ok: true });
 });
 
