@@ -1,0 +1,155 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  سوق — Design System
+  Modern Saudi classifieds. Emerald/teal primary, warm sand neutrals,
+  gold accent for "مميز". All colors HSL.
+*/
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 38 40% 98%;
+    --foreground: 175 35% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 175 35% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 175 35% 10%;
+
+    /* Brand — deep emerald-teal */
+    --primary: 168 78% 26%;
+    --primary-hover: 168 78% 22%;
+    --primary-foreground: 38 40% 98%;
+    --primary-soft: 168 50% 94%;
+
+    /* Secondary — warm sand */
+    --secondary: 36 38% 94%;
+    --secondary-foreground: 175 30% 15%;
+
+    --muted: 36 25% 95%;
+    --muted-foreground: 175 10% 42%;
+
+    --accent: 36 30% 92%;
+    --accent-foreground: 175 35% 10%;
+
+    /* Featured — warm gold */
+    --featured: 38 92% 50%;
+    --featured-foreground: 30 50% 12%;
+    --featured-soft: 42 100% 95%;
+
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 36 20% 88%;
+    --input: 36 20% 90%;
+    --ring: 168 78% 26%;
+
+    --radius: 0.85rem;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(168 78% 22%) 0%, hsl(178 65% 32%) 60%, hsl(38 70% 60%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(168 78% 26%), hsl(178 65% 34%));
+    --gradient-featured: linear-gradient(135deg, hsl(42 95% 55%), hsl(34 92% 50%));
+    --gradient-sand: linear-gradient(180deg, hsl(38 40% 98%) 0%, hsl(36 38% 94%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(175 35% 10% / 0.04);
+    --shadow-card: 0 1px 3px hsl(175 35% 10% / 0.05), 0 4px 16px -4px hsl(175 35% 10% / 0.06);
+    --shadow-card-hover: 0 6px 12px -2px hsl(175 35% 10% / 0.08), 0 12px 32px -8px hsl(168 78% 26% / 0.18);
+    --shadow-elegant: 0 10px 40px -12px hsl(168 78% 26% / 0.35);
+    --shadow-featured: 0 8px 24px -8px hsl(38 92% 50% / 0.45);
+
+    /* Motion */
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-base: all 0.25s var(--ease-out);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Tajawal', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "kern", "liga", "ss01";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+    @apply tracking-tight;
+  }
+
+  /* RTL-friendly focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background rounded-md;
+  }
+
+  /* Numbers should stay LTR even in RTL context */
+  .num {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline-block;
+  }
+}
+
+@layer components {
+  .container-app {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .card-elevated {
+    @apply bg-card rounded-2xl border border-border/60;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-base);
+  }
+  .card-elevated:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
+
+  .badge-featured {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold;
+    background: var(--gradient-featured);
+    color: hsl(var(--featured-foreground));
+    box-shadow: var(--shadow-featured);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-secondary text-secondary-foreground border border-border/60 transition-colors hover:bg-accent;
+  }
+  .chip-active {
+    @apply bg-primary text-primary-foreground border-primary hover:bg-primary;
+  }
+
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty  { text-wrap: pretty; }
+}
