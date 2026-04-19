@@ -58,12 +58,12 @@ const Browse = () => {
   }, [params]);
 
   const heading = useMemo(() => {
-    if (!data?.selected_category) return 'All ads';
+    if (!data?.selected_category) return 'كل الإعلانات';
     return data.selected_category.name;
   }, [data]);
 
   if (!data && loading) {
-    return <div className="container-app py-10">Loading...</div>;
+    return <div className="container-app py-10">جار التحميل...</div>;
   }
 
   return (
@@ -71,7 +71,7 @@ const Browse = () => {
       <div>
         <h1 className="font-display text-3xl font-extrabold">{heading}</h1>
         <p className="text-muted-foreground mt-1">
-          {loading ? 'Loading results...' : 'Results based on category and dynamic filters'}
+          {loading ? 'جار تحميل النتائج...' : 'نتائج حسب الفئة الحالية والفلاتر الديناميكية'}
         </p>
       </div>
 
@@ -88,17 +88,17 @@ const Browse = () => {
         <div className="space-y-4">
           <div className="flex items-center gap-2 justify-between">
             <div className="text-sm text-muted-foreground">
-              Breadcrumb: {(data?.breadcrumb ?? []).map((c) => c.name).join(' > ') || 'root'}
+              المسار: {(data?.breadcrumb ?? []).map((c) => c.name).join(' > ') || 'الجذر'}
             </div>
             <select
               value={params.sort ?? 'newest'}
               onChange={(e) => setParams((prev) => ({ ...prev, sort: e.target.value, page: '1' }))}
               className="h-10 border border-input rounded-lg px-3 text-sm bg-card"
             >
-              <option value="newest">Newest</option>
-              <option value="featured">Featured first</option>
-              <option value="price_asc">Price low to high</option>
-              <option value="price_desc">Price high to low</option>
+              <option value="newest">الأحدث</option>
+              <option value="featured">المميزة أولًا</option>
+              <option value="price_asc">السعر من الأقل</option>
+              <option value="price_desc">السعر من الأعلى</option>
             </select>
           </div>
 
