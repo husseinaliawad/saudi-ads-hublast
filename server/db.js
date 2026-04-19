@@ -495,8 +495,14 @@ export function createAdWithFields(payload) {
 }
 
 export function getAdsWithFilters(params) {
-  const where = ["a.status='published'"];
+  const where = [];
   const binds = [];
+
+  const requestedStatus = String(params.status || 'published').toLowerCase();
+  const allowedStatuses = new Set(['published', 'sold', 'archived', 'pending', 'rejected', 'draft']);
+  const effectiveStatus = allowedStatuses.has(requestedStatus) ? requestedStatus : 'published';
+  where.push('a.status = ?');
+  binds.push(effectiveStatus);
 
   let selectedCategoryId = null;
   if (params.category) {
@@ -526,6 +532,14 @@ export function getAdsWithFilters(params) {
   if (params.price_max !== undefined && params.price_max !== '') {
     where.push('a.price <= ?');
     binds.push(Number(params.price_max));
+  }
+  if (params.date_from) {
+    where.push('a.created_at >= ?');
+    binds.push(String(params.date_from));
+  }
+  if (params.date_to) {
+    where.push('a.created_at <= ?');
+    binds.push(String(params.date_to));
   }
   if (params.featured === '1') where.push('a.is_featured = 1');
 

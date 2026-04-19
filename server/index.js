@@ -130,7 +130,7 @@ app.get('/api/categories/:id/filters', (req, res) => {
 // Ads browsing + creation with dynamic fields
 app.get('/api/ads', (req, res) => {
   const dynamicFilters = {};
-  const reserved = new Set(['q', 'category', 'city', 'price_min', 'price_max', 'featured', 'sort', 'page', 'page_size']);
+  const reserved = new Set(['q', 'category', 'city', 'price_min', 'price_max', 'featured', 'sort', 'page', 'page_size', 'date_from', 'date_to', 'status']);
   Object.entries(req.query).forEach(([k, v]) => {
     if (reserved.has(k)) return;
     if (k.startsWith('f_')) dynamicFilters[k.slice(2)] = v;
@@ -142,6 +142,9 @@ app.get('/api/ads', (req, res) => {
     city: req.query.city,
     price_min: req.query.price_min,
     price_max: req.query.price_max,
+    date_from: req.query.date_from,
+    date_to: req.query.date_to,
+    status: req.query.status,
     featured: req.query.featured,
     sort: req.query.sort,
     page: req.query.page,

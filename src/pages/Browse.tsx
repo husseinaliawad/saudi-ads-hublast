@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { CategoryFilters } from '@/components/filters/CategoryFilters';
 import { AdsListing } from '@/components/ads/AdsListing';
 import { searchAds, type AdsSearchResponse } from '@/lib/catalog-api';
-
-const reserved = new Set(['category', 'q', 'city', 'price_min', 'price_max', 'sort', 'page', 'page_size', 'featured']);
+import { fetchCities } from '@/lib/queries';
+import type { City } from '@/types';
 
 function paramsToObject(sp: URLSearchParams) {
   const obj: Record<string, string> = {};
-  sp.forEach((v, k) => { obj[k] = v; });
+  sp.forEach((v, k) => {
+    obj[k] = v;
+  });
   if (!obj.category && obj.cat) obj.category = obj.cat;
   return obj;
 }
@@ -26,7 +28,12 @@ const Browse = () => {
   const [sp, setSp] = useSearchParams();
   const [params, setParams] = useState<Record<string, string>>(() => paramsToObject(sp));
   const [data, setData] = useState<AdsSearchResponse | null>(null);
+  const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCities().then(setCities).catch(() => setCities([]));
+  }, []);
 
   useEffect(() => {
     setSp(objectToParams(params), { replace: true });
@@ -46,16 +53,17 @@ const Browse = () => {
         setLoading(false);
       }
     }, 200);
+
     return () => clearTimeout(timer);
   }, [params]);
 
   const heading = useMemo(() => {
-    if (!data?.selected_category) return 'كل الإعلانات';
+    if (!data?.selected_category) return 'All ads';
     return data.selected_category.name;
   }, [data]);
 
   if (!data && loading) {
-    return <div className="container-app py-10">جار التحميل...</div>;
+    return <div className="container-app py-10">Loading...</div>;
   }
 
   return (
@@ -63,7 +71,7 @@ const Browse = () => {
       <div>
         <h1 className="font-display text-3xl font-extrabold">{heading}</h1>
         <p className="text-muted-foreground mt-1">
-          {loading ? 'جار تحميل النتائج...' : `نتائج حسب الفئة الحالية والفلاتر الديناميكية`}
+          {loading ? 'Loading results...' : 'Results based on category and dynamic filters'}
         </p>
       </div>
 
@@ -71,6 +79,7 @@ const Browse = () => {
         <CategoryFilters
           currentCategory={data?.selected_category ?? null}
           children={data?.children ?? []}
+          cities={cities.map((c) => ({ id: c.id, name_ar: c.name_ar }))}
           filters={data?.filters ?? []}
           values={params}
           onChange={setParams}
@@ -79,17 +88,17 @@ const Browse = () => {
         <div className="space-y-4">
           <div className="flex items-center gap-2 justify-between">
             <div className="text-sm text-muted-foreground">
-              المسار: {(data?.breadcrumb ?? []).map((c) => c.name).join(' > ') || 'الجذر'}
+              Breadcrumb: {(data?.breadcrumb ?? []).map((c) => c.name).join(' > ') || 'root'}
             </div>
             <select
               value={params.sort ?? 'newest'}
               onChange={(e) => setParams((prev) => ({ ...prev, sort: e.target.value, page: '1' }))}
               className="h-10 border border-input rounded-lg px-3 text-sm bg-card"
             >
-              <option value="newest">الأحدث</option>
-              <option value="featured">المميزة أولًا</option>
-              <option value="price_asc">السعر من الأقل</option>
-              <option value="price_desc">السعر من الأعلى</option>
+              <option value="newest">Newest</option>
+              <option value="featured">Featured first</option>
+              <option value="price_asc">Price low to high</option>
+              <option value="price_desc">Price high to low</option>
             </select>
           </div>
 
